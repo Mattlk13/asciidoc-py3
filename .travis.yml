@@ -34,4 +34,6 @@ script:
   - autoconf
   - ./configure
   - make
-  - sudo make install
+  - pip3 install .
+  - asciidoc --version
+  - a2x --version
