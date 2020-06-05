@@ -32,8 +32,12 @@ import zipfile
 from ast import literal_eval
 from collections import OrderedDict
 
-# Used by asciidocapi.py #
-VERSION = '9.0.0'           # See CHANGELOG file for version history.
+CONF_DIR = os.path.join(os.path.dirname(__file__), 'resources')
+METADATA = {}
+with open(os.path.join(os.path.dirname(__file__), '__metadata__.py')) as f:
+    exec(f.read(), METADATA)
+# See CHANGELOG file for version history.
+VERSION = METADATA['__version__']
 
 MIN_PYTHON_VERSION = '3.5'  # Require this version of Python or better.
 
@@ -45,8 +49,8 @@ DEFAULT_DOCTYPE = 'article'
 # Allowed substitution options for List, Paragraph and DelimitedBlock
 # definition subs entry.
 SUBS_OPTIONS = ('specialcharacters', 'quotes', 'specialwords',
-                'replacements', 'attributes', 'macros', 'callouts', 'normal', 'verbatim',
-                'none', 'replacements2', 'replacements3')
+                'replacements', 'attributes', 'macros', 'callouts', 'normal',
+                'verbatim', 'none', 'replacements2', 'replacements3')
 # Default value for unspecified subs and presubs configuration file entries.
 SUBS_NORMAL = ('specialcharacters', 'quotes', 'attributes',
                'specialwords', 'replacements', 'macros', 'replacements2')
@@ -1265,6 +1269,11 @@ class Lex:
         return self
 
     @staticmethod
+    def reset_class():
+        Lex.prev_element = None
+        Lex.prev_cursor = None
+
+    @staticmethod
     def next_element():
         """Returns class of next element on the input (None if EOF).  The
         reader is assumed to be at the first line following a previous element,
@@ -1820,6 +1829,15 @@ class AttributeEntry:
         raise AssertionError('no class instances allowed')
 
     @staticmethod
+    def reset_class():
+        AttributeEntry.pattern = None
+        AttributeEntry.subs = None
+        AttributeEntry.name = None
+        AttributeEntry.name2 = None
+        AttributeEntry.value = None
+        AttributeEntry.attributes = {}
+
+    @staticmethod
     def isnext():
         result = False  # Assume not next.
         if not AttributeEntry.pattern:
@@ -1907,6 +1925,12 @@ class AttributeList:
         raise AssertionError('no class instances allowed')
 
     @staticmethod
+    def reset_class():
+        AttributeList.pattern = None
+        AttributeList.match = None
+        AttributeList.attrs = {}
+
+    @staticmethod
     def initialize():
         if 'attributelist-pattern' not in document.attributes:
             message.error("[attributes] missing 'attributelist-pattern' entry")
@@ -1974,6 +1998,11 @@ class BlockTitle:
         raise AssertionError('no class instances allowed')
 
     @staticmethod
+    def reset_class():
+        BlockTitle.title = None
+        BlockTitle.pattern = None
+
+    @staticmethod
     def isnext():
         result = False  # Assume not next.
         line = reader.read_next()
@@ -2021,6 +2050,17 @@ class Title:
 
     def __init__(self):
         raise AssertionError('no class instances allowed')
+
+    @staticmethod
+    def reset_class():
+        Title.subs = ()
+        Title.pattern = None
+        Title.level = 0
+        Title.attributes = {}
+        Title.sectname = None
+        Title.section_numbers = [0] * len(Title.underlines)
+        Title.dump_dict = {}
+        Title.linecount = None
 
     @staticmethod
     def translate(skipsubs=False):
@@ -2243,6 +2283,11 @@ class Section:
         raise AssertionError('no class instances allowed')
 
     @staticmethod
+    def reset_class():
+        Section.endtags = []
+        Section.ids = []
+
+    @staticmethod
     def savetag(level, etag):
         """Save section end."""
         Section.endtags.append((level, etag))
@@ -2357,7 +2402,6 @@ class Section:
 
 
 class AbstractBlock:
-
     blocknames = []  # Global stack of names for push_blockname() and pop_blockname().
 
     def __init__(self):
@@ -2388,6 +2432,10 @@ class AbstractBlock:
         self.parameters = None
         # Leading delimiter match object.
         self.mo = None
+
+    @staticmethod
+    def reset_class():
+        AbstractBlock.blocknames = []
 
     def short_name(self):
         """ Return the text following the first dash in the section name."""
@@ -5938,6 +5986,10 @@ class Plugin:
     type = None     # 'backend', 'filter' or 'theme'.
 
     @staticmethod
+    def reset_class():
+        Plugin.type = None
+
+    @staticmethod
     def get_dir():
         """
         Return plugins path (.asciidoc/filters or .asciidoc/themes) in user's
@@ -6052,8 +6104,6 @@ class Plugin:
 APP_FILE = None             # This file's full path.
 APP_DIR = None              # This file's directory.
 USER_DIR = None             # ~/.asciidoc
-# Global configuration files directory (set by Makefile build target).
-CONF_DIR = '/usr/local/etc/asciidoc'
 HELP_FILE = 'help.conf'     # Default (English) help file.
 
 # Globals
@@ -6075,6 +6125,34 @@ trace = Trace()             # Implements trace attribute processing.
 # Used by asciidocapi.py #
 # List of message strings written to stderr.
 messages = message.messages
+
+
+def reset_asciidoc():
+    global document, config, reader, writer, message
+    global paragraphs, lists, blocks, tables_OLD, tables
+    global macros, calloutmap, trace
+
+    document = Document()
+    config = Config()
+    reader = Reader()
+    writer = Writer()
+    message = Message()
+    paragraphs = Paragraphs()
+    lists = Lists()
+    blocks = DelimitedBlocks()
+    tables_OLD = Tables_OLD()
+    tables = Tables()
+    macros = Macros()
+    calloutmap = CalloutMap()
+    trace = Trace()
+
+    Lex.reset_class()
+    AttributeEntry.reset_class()
+    Title.reset_class()
+    BlockTitle.reset_class()
+    Section.reset_class()
+    AbstractBlock.reset_class()
+    Plugin.reset_class()
 
 
 def asciidoc(backend, doctype, confiles, infile, outfile, options):
@@ -6193,7 +6271,7 @@ def asciidoc(backend, doctype, confiles, infile, outfile, options):
         document.update_attributes()
         # Set the default embedded icons directory.
         if 'data-uri' in document.attributes and not os.path.isdir(document.attributes['iconsdir']):
-            document.attributes['iconsdir'] = os.path.join(document.attributes['asciidoc-confdir'], 'images/icons')
+            document.attributes['iconsdir'] = os.path.join(document.attributes['asciidoc-confdir'], 'icons')
         # Configuration is fully loaded.
         config.expand_all_templates()
         # Check configuration for consistency.
@@ -6402,7 +6480,7 @@ def execute(cmd, opts, args):
         sys.stdin, sys.stdout = stdin, stdout
 
 
-if __name__ == '__main__':
+def cli():
     # Process command line options.
     try:
         # DEPRECATED: --unsafe option.
@@ -6454,3 +6532,7 @@ if __name__ == '__main__':
             execute(sys.argv[0], opts, args)
         except KeyboardInterrupt:
             sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()
