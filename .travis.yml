@@ -28,7 +28,7 @@ addons:
 install: true
 
 script:
-  - python asciidoc.py --doctest
+  - python asciidoc/asciidoc.py --doctest
   - time python tests/testasciidoc.py run
   - git clean -x -f doc tests/data
   - autoconf
