@@ -173,7 +173,7 @@ class AsciiDocTest(object):
         with open(self.backend_filename(backend), encoding='utf-8') as open_file:
             result = open_file.readlines()
             # Strip line terminators.
-            result = [s.rstrip() for s in result]
+            result = [s for s in result]
         return result
 
     def generate_expected(self, backend):
@@ -186,7 +186,7 @@ class AsciiDocTest(object):
         infile = self.source
         outfile = io.StringIO()
         asciidoc.execute(infile, outfile, backend)
-        return outfile.getvalue().splitlines()
+        return outfile.getvalue().splitlines(keepends=True)
 
     def update_expected(self, backend):
         """
